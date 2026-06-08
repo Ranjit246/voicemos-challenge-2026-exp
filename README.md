@@ -15,7 +15,7 @@ Predicting speaker and accent similarity scores for neural audio codec (NAC)-bas
 
 Given `wav_a` (a synthesized speech sample) and `wav_b` (a natural VCTK reference), the model must output predicted scores for both targets. The primary leaderboard metric is **utterance-level Spearman Rank Correlation Coefficient (UTT-SRCC)**.
 
-Participants may submit predictions for one or both targets independently.
+Participants may submit predictions for one or both targets, but **CodaBench scoring requires both columns to be present** in the submission file — even if both contain the same values.
 
 ---
 
@@ -60,7 +60,17 @@ system_id, utterance_id, wav_a_path, wav_b_path
 
 No labels — generate predictions and submit to CodaBench.
 
-### Score distribution (training set)
+### Train vs Dev system overlap
+
+| | Systems |
+|---|---|
+| Train only | — |
+| Dev only (unseen during training) | `sys003`, `sys015` |
+| Both | `sys001`, `sys002`, `sys005`–`sys018`, `sys020`, `sys022`–`sys026` |
+
+Dev contains **2 unseen systems** — a key generalization challenge.
+
+### Score distribution (training set, listener-wise)
 
 Both targets are **skewed toward 4–5** — most systems reproduce speaker and accent well:
 
@@ -72,6 +82,34 @@ Both targets are **skewed toward 4–5** — most systems reproduce speaker and 
 | 4 | 3,177 | 3,234 |
 | 5 | 6,835 | 6,758 |
 | **Mean** | **4.04** | **4.02** |
+
+### Per-system mean scores (training set)
+
+| System | spk_sim | acc_sim | n pairs |
+|---|---|---|---|
+| sys008 | 4.764 | 4.702 | 136 |
+| sys006 | 4.665 | 4.603 | 135 |
+| sys014 | 4.587 | 4.529 | 133 |
+| sys011 | 4.577 | 4.467 | 135 |
+| sys009 | 4.529 | 4.229 | 135 |
+| sys023 | 4.472 | 4.345 | 134 |
+| sys024 | 4.393 | 4.284 | 134 |
+| sys002 | 4.347 | 4.107 | 135 |
+| sys013 | 4.333 | 4.311 | 132 |
+| sys001 | 4.296 | 4.292 | 134 |
+| sys010 | 4.143 | 4.051 | 134 |
+| sys017 | 4.169 | 4.166 | 129 |
+| sys012 | 4.036 | 4.046 | 135 |
+| sys025 | 3.928 | 3.978 | 134 |
+| sys022 | 3.835 | 3.778 | 130 |
+| sys026 | 3.726 | 3.769 | 134 |
+| sys005 | 3.290 | 3.443 | 135 |
+| sys007 | 3.425 | 3.405 | 132 |
+| sys016 | 3.323 | 3.562 | 131 |
+| sys018 | 3.162 | 3.345 | 130 |
+| sys020 | 2.754 | 3.036 | 133 |
+
+System mean std = 0.56 — large spread, which makes system-level memorization a risk.
 
 ### Data distributions (two separate downloads)
 
@@ -105,7 +143,9 @@ system_id,utterance_id,wav_a_path,wav_b_path,pred_acc_sim,pred_spk_sim
 sys003,utt010,wav/...,wav/...,3.76,4.12
 ```
 
-Submit as: `zip -j <any_name>.zip answer.txt`
+- Both `pred_acc_sim` and `pred_spk_sim` columns must be present (CodaBench requirement)
+- Scores are floats, no range restriction enforced by scorer — but clamp to [1, 5] to be safe
+- Submit as: `zip -j <any_name>.zip answer.txt`
 
 ---
 
@@ -117,7 +157,7 @@ voicemos-challenge-2026-exp/
 ├── metrics_voicemos.py              ← official evaluation metrics (snippet)
 ├── NeMo/                            ← NVIDIA NeMo toolkit (submodule)
 │   └── examples/speaker_tasks/recognition/
-│       └── extract_speaker_embeddings.py   ← patched for CPU/MPS device detection
+│       └── extract_speaker_embeddings.py   ← patched for CPU device detection
 └── titanet_large/                   ← Experiment 1: TitaNet-Large baseline
     ├── README.md                    ← experiment-specific notes
     ├── avg_scores.py                ← aggregate listener ratings → mean per pair
@@ -129,12 +169,14 @@ voicemos-challenge-2026-exp/
     │   ├── speaker_embed_train_gen.sh  ← end-to-end extraction script
     │   └── embeddings/embeddings/
     │       └── manifest_embeddings.pt  ← extracted embeddings (192-dim each)
-    ├── mlp-train-head/
-    │   ├── train.py                 ← MLP trainer with cosine baseline
-    │   ├── train.log                ← training results
-    │   └── best_model.pt            ← best checkpoint by mean SRCC
-    └── train/
-        └── Speaker_Identification_Verification.ipynb
+    └── mlp-train-head/
+        ├── train.py                 ← MLP trainer with cosine baseline printout
+        ├── train.log                ← training results
+        ├── best_model.pt            ← best checkpoint by mean SRCC
+        ├── infer_dev.py             ← run best_model.pt on dev.csv → answer.txt
+        ├── infer_cosine_baseline.py ← cosine-only inference → answer_cosine.txt
+        ├── answer.txt               ← MLP predictions (submitted)
+        └── answer_cosine.txt        ← cosine baseline predictions (submitted)
 ```
 
 ---
@@ -153,7 +195,7 @@ voicemos-challenge-2026-exp/
 
 ### Cosine similarity baseline
 
-Computes `cosine(emb_a, emb_b)` directly as the predictor:
+Computes `cosine(emb_a, emb_b)` directly as the predictor. Linearly scaled to [1, 5] before submission:
 - For `spk_sim`: natural fit — TitaNet is trained for speaker identity
 - For `acc_sim`: weak proxy — same score reused, TitaNet not trained for accent
 
@@ -166,19 +208,30 @@ Input: 768-dim pair feature
 Output: [pred_spk_sim, pred_acc_sim]
 ```
 
-Training: MSE loss, Adam optimizer, cosine LR annealing, 90/10 train/val split.
+Training: MSE loss, Adam optimizer, cosine LR annealing, 90/10 random train/val split.
 
-### Results (val split, seed=42)
+### Internal validation results (val split, seed=42)
 
 | Model | SRCC spk_sim | SRCC acc_sim | Mean SRCC |
 |---|---|---|---|
 | Cosine similarity baseline | 0.5991 | 0.4944 | 0.5468 |
 | MLP 768→128→2 (50 epochs) | **0.6264** | **0.5919** | **0.6091** |
 
-**Key observations:**
-- MLP improves `acc_sim` by **+0.097** — the two output heads learn different weightings of embedding dimensions for each target
-- `spk_sim` improvement is modest (**+0.027**) — cosine similarity was already a strong signal for speaker identity
-- Training loss still decreasing at epoch 50 — model not fully converged
+### CodaBench (dev set) results
+
+| Submission | SRCC spk_sim | SRCC acc_sim |
+|---|---|---|
+| MLP 768→128→2 | 0.3579 | 0.3750 |
+| Cosine baseline | TBD | TBD |
+
+### Analysis — why the gap?
+
+The internal val SRCC (~0.63) is much higher than CodaBench dev SRCC (~0.36). Root cause: **system-level memorization**.
+
+- The MLP learned to predict largely based on *which system* the embedding comes from (system means range from 2.75 to 4.76, std=0.56) rather than from acoustic pair features
+- The random 90/10 val split included the same 21 systems as training, so val looked artificially good
+- Dev has 2 **unseen systems** (`sys003`, `sys015`) — the model has no prior for these
+- A correct evaluation strategy is **leave-one-system-out** or split by utterance ID, not randomly
 
 ### Training curve
 
@@ -188,7 +241,7 @@ Epoch      loss   SRCC_spk   SRCC_acc
     5    0.5354     0.4516     0.4468
    10    0.3880     0.5530     0.5320
    20    0.3226     0.6019     0.5749
-   35    0.2860     0.6254     0.5914  ← best
+   35    0.2860     0.6254     0.5914  ← best checkpoint
    50    0.2734     0.6264     0.5919
 ```
 
@@ -206,42 +259,51 @@ cd ..
 # 3. Train MLP head
 cd mlp-train-head
 /path/to/venv/bin/python3 train.py
+
+# 4. Run inference → answer.txt
+/path/to/venv/bin/python3 infer_dev.py
+
+# 5. Run cosine baseline → answer_cosine.txt
+/path/to/venv/bin/python3 infer_cosine_baseline.py
+
+# 6. Submit
+zip -j submission.zip answer.txt
 ```
 
 ---
 
 ## Planned / Next Experiments
 
-### Improve current TitaNet baseline
-- [ ] Train longer (`--epochs 200`) — loss was still falling at epoch 50
-- [ ] Search over hidden sizes: `[256]`, `[256 128]`, `[512 256]`
-- [ ] Add cosine scalar as explicit input alongside the 768-dim pair vector
-- [ ] Separate MLP heads for `spk_sim` and `acc_sim` — may help accent modeling
+### Fix evaluation strategy
+- [ ] **Leave-one-system-out cross-validation** — train on 20 systems, validate on 1; honest measure of generalization to unseen systems
+- [ ] Split val by utterance ID (not randomly) to avoid system-level leakage
+
+### Improve generalization of MLP
+- [ ] Higher dropout (0.3–0.5), weight decay, early stopping on system-agnostic val
+- [ ] Add cosine scalar as an explicit input feature — it's a purer acoustic signal
+- [ ] Separate MLP heads per target — decouple `spk_sim` and `acc_sim` learning
 
 ### Stronger base embeddings
-- [ ] **WavLM-large** (`microsoft/wavlm-large`) — 1024-dim SSL features, top-performing on SUPERB speaker tasks; likely biggest single improvement
-- [ ] **ECAPA-TDNN** (SpeechBrain `spkrec-ecapa-voxceleb`) — already available in `exp-asv/infer_all.py`; compare against TitaNet
-- [ ] **Qwen3 speaker encoder** — ONNX model already available locally (see `exp-asv/`)
-- [ ] **Ensemble** — combine cosine scores from multiple speaker models as input features
+- [ ] **WavLM-large** (`microsoft/wavlm-large`) — 1024-dim SSL features, top on SUPERB speaker tasks; likely biggest single improvement
+- [ ] **ECAPA-TDNN** (SpeechBrain `spkrec-ecapa-voxceleb`) — already in `exp-asv/infer_all.py`
+- [ ] **Qwen3 speaker encoder** — ONNX model already available locally
+- [ ] **Ensemble** — combine cosine scores from multiple speaker models as features
 
 ### Better accent modeling
-- [ ] TitaNet captures speaker identity but not accent explicitly — the persistent gap between `spk_sim` and `acc_sim` SRCC reflects this
-- [ ] Explore wav2vec2 / HuBERT middle layers (frame-level features capture phonetics better than speaker embeddings)
-- [ ] Consider a model with explicit accent supervision
+- [ ] TitaNet captures speaker identity, not accent — persistent `acc_sim` gap reflects this
+- [ ] Explore wav2vec2 / HuBERT middle layers (phonetic features)
+- [ ] Consider a model with explicit accent/dialect supervision
 
 ### End-to-end fine-tuning
-- [ ] Fine-tune TitaNet encoder itself on the similarity regression task (not just the MLP head)
-- [ ] Use listener-wise scores (not just mean) as training signal — introduces uncertainty modeling
-
-### Submission
-- [ ] Write `infer_dev.py` — load best checkpoint, run on `dev.csv`, write `answer.txt`
-- [ ] Zip and submit: `zip -j submission.zip answer.txt`
+- [ ] Fine-tune TitaNet encoder on similarity regression (not just the MLP head)
+- [ ] Train with listener-wise scores rather than mean — captures annotation uncertainty
 
 ---
 
-## Notes
+## Implementation Notes
 
-- NeMo's filterbank op does not support Apple MPS — extraction runs on CPU only. `PYTORCH_ENABLE_MPS_FALLBACK=1` does not catch this op.
+- **CodaBench requires both `pred_acc_sim` and `pred_spk_sim` columns** — submitting only one returns `{}` (empty scores), even though the challenge description says single-target submission is allowed
+- NeMo's filterbank op does not support Apple MPS — extraction runs on CPU only; `PYTORCH_ENABLE_MPS_FALLBACK=1` does not catch this op
 - NeMo embedding key format: `<dataset_dir_name>@wav@<filename>.wav` (last 3 path components joined with `@`)
-- `wav_b` is always from `sys019` (VCTK natural speech) in both train and dev sets
-- Paper reference for system-level analysis: [arXiv:2603.14328](https://arxiv.org/abs/2603.14328) — Table 1 shows per-system similarity scores useful for sanity-checking predictions
+- `wav_b` is always `sys019` (VCTK natural speech) in both train and dev
+- Python venv: `/Users/ranjitpatro/Home/Research/VoiceMOS/venv`
