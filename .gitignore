@@ -1,1 +1,3 @@
 titanet_large/mlp-train-head/reports
+wav2vec2/reports
+*.pt
