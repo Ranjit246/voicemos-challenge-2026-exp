@@ -1,1 +1,26 @@
-nemo_toolkit['all']
+# VoiceMOS Challenge 2026 — Track 3
+# Core dependencies only. NeMo (for TitaNet) has its own install — see NeMo/README.
+
+# PyTorch
+torch==2.12.0
+torchaudio==2.11.0
+
+# Audio
+librosa==0.11.0
+soundfile==0.14.0
+
+# Transformers / HuggingFace (wav2vec2 accent model)
+transformers==4.57.6
+huggingface_hub==0.36.2
+
+# pyannote (WeSpeaker embeddings)
+pyannote.audio==4.0.5
+
+# Data / ML
+numpy==2.4.6
+pandas==3.0.3
+scipy==1.17.1
+scikit-learn==1.9.0
+
+# Utilities
+tqdm==4.68.1

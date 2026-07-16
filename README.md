@@ -222,7 +222,17 @@ Training: MSE loss, Adam optimizer, cosine LR annealing, 90/10 random train/val 
 | Submission | SRCC spk_sim | SRCC acc_sim |
 |---|---|---|
 | MLP 768→128→2 | 0.3579 | 0.3750 |
-| Cosine baseline | TBD | TBD |
+| wav2vec2 accent 13-d prob cosine | — | 0.3186 |
+| Idea A: system-mean shrinkage (`idea-a-shrinkage/`) | 0.4263 | 0.3730 |
+| Idea D: fusion + system-label prior (`idea-d-system-prior/`) | 0.4781 | 0.4157 |
+| **Idea E: extended feature fusion + prior (`idea-e-feature-fusion/`)** | **0.5008** | **0.4769** |
+| — official B1 (ECAPA cosine) | 0.432 | 0.369 |
+| — official B2 (ECAPA + trained head) | 0.451 | 0.440 |
+| — leaderboard leader | 0.629 | 0.608 |
+
+**Idea E is our best — beats every official baseline on both targets** (spk crossed 0.50; acc beats B2 for the first time). CommonAccent-ECAPA was the accent unlock (+0.061 acc over Idea D). Predicted 0.49/0.46 → got 0.501/0.477 (harness calibration holding). Gap to leader now ~0.13.
+
+**Idea D is our best: spk 0.478 beats both official baselines** ([vmc2026-baselines](https://github.com/voicemos-challenge/vmc2026-baselines)); acc 0.416 beats B1, below B2. Full strategy + calibrated harness in [PLAN.md](PLAN.md) / [eval_harness.py](eval_harness.py). Idea B (counterfactual pairs) was a documented negative — the metric can't reward accent≠speaker decorrelation.
 
 ### Analysis — why the gap?
 

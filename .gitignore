@@ -1,3 +1,33 @@
-titanet_large/mlp-train-head/reports
-wav2vec2/reports
+# OS / editor junk
+.DS_Store
+**/.DS_Store
+__pycache__/
+*.pyc
+
+# NVIDIA NeMo toolkit — 641M, has its own git; install separately
+NeMo/
+
+# pretrained model caches / checkpoints
+pretrained*/
+*.ckpt
+*.nemo
+
+# embeddings & feature tensors (derived from licensed audio)
 *.pt
+
+# LICENSED-DATA DERIVATIVES — must NOT be distributed (VoiceMOS data license).
+# All regenerate by running the scripts on the licensed dataset.
+*.csv
+**/manifest.json
+**/answer*.txt
+**/train_avg.csv
+
+# submission / scoring artifacts (contain dev pair lists)
+*.zip
+
+# run logs
+*.log
+
+# old report dirs
+titanet_large/mlp-train-head/reports/
+wav2vec2/reports/
