@@ -225,10 +225,63 @@ Training: MSE loss, Adam optimizer, cosine LR annealing, 90/10 random train/val 
 | wav2vec2 accent 13-d prob cosine | — | 0.3186 |
 | Idea A: system-mean shrinkage (`idea-a-shrinkage/`) | 0.4263 | 0.3730 |
 | Idea D: fusion + system-label prior (`idea-d-system-prior/`) | 0.4781 | 0.4157 |
-| **Idea E: extended feature fusion + prior (`idea-e-feature-fusion/`)** | **0.5008** | **0.4769** |
+| Idea E: extended feature fusion + prior (`idea-e-feature-fusion/`) | 0.5008 | 0.4769 |
+| Idea F: + all-25 WavLM-Large layers (`idea-f-wavlm/`) | 0.5334 | 0.5480 |
+| Idea G: multi-SSL 98-feature fusion (`idea-g-multi-ssl/`) | 0.5257 | 0.5414 |
+| Idea H: trained pairwise head (`idea-h-trained-head/`) | 0.5303 | 0.5471 |
+| Idea I: ensemble F + trained head (`idea-i-ensemble/`) | 0.5652 | 0.5858 |
+| **★ Idea I: balanced ensemble F : 6-head-avg (`idea-i-ensemble/submission-2`)** | **0.5680** | **0.5878** |
+| Idea I: OOF-optimized weights (`submission-4`) | 0.5654 | 0.5883 |
+| Idea I: greedy 4-member F+G+wavlm/hubert heads (`submission-5`) | 0.5659 | 0.5887 |
+| Idea K: RAMP retrieval fusion, cosine-space (`idea-k-ramp/`) | 0.5661 | 0.5890 |
+| **★ Idea K: RAMP retrieval, SSL embedding-diff space (`idea-k-ramp/submission-2`)** | **0.5745** | **0.5986** |
 | — official B1 (ECAPA cosine) | 0.432 | 0.369 |
 | — official B2 (ECAPA + trained head) | 0.451 | 0.440 |
 | — leaderboard leader | 0.629 | 0.608 |
+
+---
+
+## ★ BEST METHOD (final)
+
+**Balanced diversity ensemble — `idea-i-ensemble/submission-2` — spk 0.568 / acc 0.588.**
+Beats every official baseline; accent within 0.020 of the leaderboard leader.
+
+The method, end to end:
+
+1. **Features** — for each utterance, extract cosine similarities between the (synthesized, reference) pair from a panel of frozen pretrained models: ECAPA-TDNN, TitaNet, WeSpeaker (speaker); CommonAccent-ECAPA + wav2vec2 accent model (accent); **all 25 WavLM-Large layers** (the single biggest lift, esp. for accent); plus UTMOS naturalness scalars.
+2. **Member F** — ridge regression over those ~35 cosine features (linear, regularized → generalizes to unseen systems).
+3. **Member H** — a small **trained pairwise head** on frozen WavLM features (learnable per-task layer weighting + pair interactions + margin-ranking loss); averaged over 6 seeds to reduce variance.
+4. **Ensemble** — rank/z-score average of F and the 6-seed head at a **1:1 balance** (diverse inductive biases: linear-cosine vs learned-metric — this diversity is what lifted 0.53→0.57).
+5. **System-label prior** — blend each prediction toward its system's mean *training* label (dev is 21/23 in-domain systems); α≈0.5 spk / 0.6 acc.
+
+### Why this is the best (what we learned)
+
+- **Diversity-ensembling is the lever**, not any single model. F alone ≈ 0.533; the trained head alone ≈ 0.530; ensembled ≈ 0.568.
+- **Regularized-linear generalizes; big trained models overfit** the 2,800 pairs — the recurring lesson (Ideas H, J).
+- **WavLM-Large all-layers** carried the accent signal that every accent-specific model couldn't (Idea F: +0.07 acc).
+- The method **plateaus at ~0.567/0.588** — weight optimization (submission-4), more diverse SSL backbones (HuBERT/XLSR, submission-5), and listener modeling (Idea J) all converge to the same point. The remaining gap to the leader needs external supervision (VoxSim), not more tuning.
+
+### Reproduce the best submission
+
+```bash
+# features already extracted; on the Mac:
+python idea-f-wavlm/make_submission.py          # member F (WavLM fusion + prior)
+# 6 trained-head seeds (H100): idea-h-trained-head/train_head.py --seed 0..5
+python idea-i-ensemble/ensemble.py <F> <head_s0..s5> --out head_avg.txt   # then F:head_avg 1:1
+# -> submission-2/answer.txt ; zip -j submission.zip answer.txt   (inner file MUST be answer.txt)
+```
+
+### Informative negatives (documented, reusable for the paper)
+
+- **Idea B** counterfactual pairs — metric can't reward accent≠speaker (confound is intrinsic).
+- **Idea G** stacking HuBERT/XLSR/WavLM-base — redundant, dilutes; WavLM alone wins.
+- **Idea H/J** trained head & listener modeling — overfit / re-introduce rater noise; ridge wins.
+
+> **Gotcha:** the file inside the submission zip MUST be named `answer.txt` — a mis-named inner file makes CodaBench finish with **no score** (looks like a server error; it isn't).
+
+**Idea I (ensemble) is our best — 0.565/0.586.** The trained head is no better alone, but rank-averaging it with the ridge fusion jumps +0.03/+0.04 (diverse inductive biases). acc now within 0.022 of the leader. Diversity-ensembling is the active lever.
+
+**Idea F is our best — spk 0.533 / acc 0.548** (acc now exceeds spk for the first time; WavLM mid-layers carried the accent signal, +0.071 acc over Idea E). WavLM-Large extracted on an H100 in 23s; individual layer cosines are weak but ridge combines all 25 into complementary signal. Predicted 0.52/0.51 → got 0.533/0.548. Gap to leader: spk 0.096 / acc 0.060.
 
 **Idea E is our best — beats every official baseline on both targets** (spk crossed 0.50; acc beats B2 for the first time). CommonAccent-ECAPA was the accent unlock (+0.061 acc over Idea D). Predicted 0.49/0.46 → got 0.501/0.477 (harness calibration holding). Gap to leader now ~0.13.
 
