@@ -1,6 +1,6 @@
 # VoiceMOS 2026 Track 3 — System Description (paper stats & methods)
 
-Working reference for the ICASSP 2027 system-description paper. All numbers are from our
+Working reference for the system-description paper. All numbers are from our
 experiments; **dev-set UTT-SRCC is the CodaBench leaderboard metric**. Fill in team name/authors.
 
 ---

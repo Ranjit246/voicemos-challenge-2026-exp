@@ -151,11 +151,11 @@ About **6-8 GB of GPU memory** at peak during WavLM-Large fp16 feature extractio
 
 ## Paper writing
 
-**Are you planning to submit a paper to ICASSP 2027?**
-No. *[CONFIRM — change to "Yes" if you decide to submit to the ICASSP 2027 regular track.]*
+**Are you planning to submit a paper to the challenge's associated conference?**
+No.
 
 **If not, what are the reasons... Will you submit one elsewhere?**
-Since the VoiceMOS special-session proposal to ICASSP 2027 was not accepted, I am no longer targeting ICASSP specifically. As an independent participant I would prefer a venue where this kind of system-plus-negative-results paper fits well, so I plan to submit to **another conference (e.g., Interspeech 2027) and/or release an arXiv preprint** summarizing the system, the ablations, and the negative results. *[CONFIRM your preferred venue.]*
+Since the VoiceMOS special-session proposal was not accepted, I am no longer targeting that venue. As an independent participant I would prefer a venue where this kind of system-plus-negative-results paper fits well, so I plan to submit to **another conference (e.g., Interspeech 2027) and/or release an arXiv preprint** summarizing the system, the ablations, and the negative results. *[CONFIRM your preferred venue.]*
 
 ---
 

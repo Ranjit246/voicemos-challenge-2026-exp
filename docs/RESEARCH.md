@@ -44,8 +44,8 @@ augmentation** and **training-data diversity** for OOD — not a new paradigm. R
 4. Keep the system-prior (safe per LOSO) but don't rely on it for OOD.
 
 ## Competition / paper context
-- Eval set released **Jul 31**, submit by **Aug 7**, results Aug 31. Paper deadline **Sep 16 (ICASSP 2027)**.
-- Venue: planned **ICASSP 2027 special session / satellite workshop**; system-description paper **mandatory**.
+- Eval set released **Jul 31**, submit by **Aug 7**, results Aug 31. Paper deadline **mid-Sep**.
+- Venue: a special session / satellite workshop was planned but not accepted; system-description paper **mandatory**.
 - **Any public dataset allowed** (VoxSim, MOS-Bench, etc.); no proprietary/self-collected MOS.
 - **Non-winning teams routinely publish** (DDOS, Nguyen, UWB-NTIS, Chinen analysis paper). Bar = beat
   baselines + document learnable content. We beat B2 by +0.12–0.15 → clear the bar decisively.

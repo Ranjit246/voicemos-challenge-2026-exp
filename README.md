@@ -58,7 +58,7 @@ a system prior and a label-free smoothing step:
 | **[`final_system/`](final_system/)** | **The system that produced the official result.** Feature extraction for the eval set, training on train+dev (3,400 pairs), prediction, and the smoothing post-process. |
 | [`experiments/`](experiments/) | Every idea that was explored — kept for the record, including the ones that failed. |
 | [`results/`](results/) | Official scores, the figures above, and the scripts that generate them. |
-| [`docs/`](docs/) | [PAPER.md](docs/PAPER.md) (full technical reference), the [ICASSP paper](docs/paper/), the [system description](docs/system_description.md), research notes. |
+| [`docs/`](docs/) | [PAPER.md](docs/PAPER.md) (full technical reference), the [paper draft](docs/paper/), the [system description](docs/system_description.md), research notes. |
 | `eval_harness.py` | Grouped-CV-by-system validation harness (the gate every idea had to pass). |
 | `metrics_voicemos.py` | Official metric implementation. |
 
@@ -158,7 +158,7 @@ cd final_system/submission_v2 && zip -j submission.zip answer.txt
 ## Documentation
 
 - **[docs/PAPER.md](docs/PAPER.md)** — full technical reference: method, all stats, ablations, negatives
-- **[docs/paper/](docs/paper/)** — ICASSP-format paper (LaTeX)
+- **[docs/paper/](docs/paper/)** — system paper draft (LaTeX, two-column)
 - **[docs/system_description.md](docs/system_description.md)** — challenge system-description questionnaire
 - **[results/README.md](results/README.md)** — official scores in full
 
