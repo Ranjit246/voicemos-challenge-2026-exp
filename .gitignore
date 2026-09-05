@@ -29,7 +29,7 @@ pretrained*/
 *.log
 
 # old report dirs
-titanet_large/mlp-train-head/reports/
-wav2vec2/reports/
-idea-i-ensemble/oof
-idea-i-ensemble/head_avg.txt
+experiments/titanet_large/mlp-train-head/reports/
+experiments/wav2vec2/reports/
+experiments/idea-i-ensemble/oof/
+experiments/idea-i-ensemble/head_avg.txt

@@ -37,7 +37,7 @@ Official baselines: https://github.com/voicemos-challenge/vmc2026-baselines (`tr
 New `voicemos-challenge-2026-exp/eval_harness.py`:
 - **Grouped CV by system**: ~7 folds × 3 held-out systems (129–136 pairs each → ~400-pair folds, close to dev's 600). Report mean±std UTT-SRCC via the official formula (`metrics_voicemos.py`).
 - Report random-split SRCC alongside — the gap is the "system-memorization gauge" for every model.
-- Reuse: `titanet_large/train_avg.csv` (mean labels), existing embedding dicts + shared key format.
+- Reuse: `experiments/titanet_large/train_avg.csv` (mean labels), existing embedding dicts + shared key format.
 - **Rule: nothing is submitted unless grouped-CV SRCC beats the best previous submission.** (Submissions are scarce.)
 
 ### Phase 1 — Replicate official baselines + honest cosine leaderboard (~1 day, no training)
@@ -98,10 +98,10 @@ Optional robustness add-on: **RAMP-style kNN blend** — retrieve k nearest trai
 |---|---|
 | `voicemos-challenge-2026-exp/eval_harness.py` | NEW — grouped-CV gate |
 | `voicemos-challenge-2026-exp/baselines/` | NEW — clone + run official B1/B2 |
-| `voicemos-challenge-2026-exp/ecapa/`, `commonaccent/`, `utmos/`, `whisper_accent/` | NEW extractors (mirror `pyannote/infer_embed.py` pattern) |
+| `voicemos-challenge-2026-exp/ecapa/`, `commonaccent/`, `utmos/`, `whisper_accent/` | NEW extractors (mirror `experiments/pyannote/infer_embed.py` pattern) |
 | `voicemos-challenge-2026-exp/fusion/` | NEW — Phase 2 feature table + ridge/GBM + submission writer |
 | `voicemos-challenge-2026-exp/svsnetplus/` | NEW — Phase 3 model (GPU) |
-| `titanet_large/train_avg.csv`, existing `.pt` dicts, `metrics_voicemos.py` | reuse |
+| `experiments/titanet_large/train_avg.csv`, existing `.pt` dicts, `metrics_voicemos.py` | reuse |
 
 ---
 
@@ -135,7 +135,7 @@ final_score(pair) = α · model_score(pair) + (1−α) · mean(model_score of al
 | **Different speaker, SAME accent** | low (~1.5) | **high (~4)** ← the decorrelating case! |
 | Different speaker, different accent | low (~1.5) | low (~2) |
 
-- Group the sys019 wavs by speaker: cluster their WeSpeaker embeddings (`pyannote/embeddings.pt` — speaker clustering is exactly what these are for). Get accent labels per cluster via CommonAccent/Whisper-accent posteriors (majority vote per cluster).
+- Group the sys019 wavs by speaker: cluster their WeSpeaker embeddings (`experiments/pyannote/embeddings.pt` — speaker clustering is exactly what these are for). Get accent labels per cluster via CommonAccent/Whisper-accent posteriors (majority vote per cluster).
 - Add a few hundred such pairs to training with soft labels (or use them only in a ranking loss: "this pair must score below that pair on spk but above it on acc").
 - **This is the only way the acc head can learn accent ≠ speaker** — the real data never shows it. It should specifically raise acc_sim SRCC, our weakest number.
 

@@ -1,8 +1,8 @@
 """Apply transductive system-mean smoothing (w=0.7) to the eval answer.txt (validated +0.007/+0.008)."""
 import pandas as pd
 W = 0.7
-IN = "/Users/ranjitpatro/Home/Research/VoiceMOS/voicemos-challenge-2026-exp/eval_pipeline/submission/answer.txt"
-OUT = "/Users/ranjitpatro/Home/Research/VoiceMOS/voicemos-challenge-2026-exp/eval_pipeline/submission_v2/answer.txt"
+IN = "/Users/ranjitpatro/Home/Research/VoiceMOS/voicemos-challenge-2026-exp/final_system/submission/answer.txt"
+OUT = "/Users/ranjitpatro/Home/Research/VoiceMOS/voicemos-challenge-2026-exp/final_system/submission_v2/answer.txt"
 import os; os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
 d = pd.read_csv(IN)

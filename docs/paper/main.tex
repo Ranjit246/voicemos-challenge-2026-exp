@@ -1,0 +1,375 @@
+\documentclass{article}
+\usepackage{spconf,amsmath,graphicx,booktabs,url,amssymb}
+
+\ninept
+
+\title{Retrieval in Pair-Difference Space and Transductive System Smoothing \\
+       for Speaker and Accent Similarity Prediction}
+
+\name{Ranjit Patro}
+\address{Independent Researcher, India \\
+         \texttt{ranjitpatro100@gmail.com}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We describe our submission to Track 3 of the VoiceMOS Challenge 2026, which asks
+for utterance-level prediction of speaker similarity (\textsc{spk}) and accent
+similarity (\textsc{acc}) between a codec- or TTS-generated utterance and a
+natural reference recording of the target speaker reading a \emph{different}
+sentence. Our system uses no backbone fine-tuning: it fuses cosine features from
+seven frozen pretrained models with a retrieval component, a small trained
+pairwise head, and a system-level prior. Its two distinguishing components are
+(i) \emph{retrieval in pair-difference space}, a variant of RAMP in which the
+retrieval key is the difference between the two utterances' self-supervised
+embeddings rather than a single utterance, and (ii) \emph{transductive
+system-mean smoothing}, a label-free inference-time step that pulls each
+prediction toward the predicted mean of its own system. On the official
+evaluation set our system reaches 0.549 / 0.474 utterance-level SRCC and
+0.942 / 0.902 system-level SRCC for \textsc{spk} / \textsc{acc}, placing third
+of seven teams at system level and improving on both official baselines by
+0.14 and 0.09 SRCC respectively. We further report several negative results,
+including a reproducible failure of listener-dependent modelling on this data.
+\end{abstract}
+
+\keywords{speech quality assessment, speaker similarity, accent similarity,
+retrieval augmentation, self-supervised speech models}
+
+\section{Introduction}
+
+Subjective evaluation remains the reference standard for assessing generated
+speech, and automatic mean-opinion-score (MOS) prediction aims to approximate it
+cheaply \cite{utmos,mosbench}. Track 3 of the VoiceMOS Challenge 2026
+\cite{codecmos} departs from single-utterance MOS in two respects: the quantity
+being predicted is a \emph{similarity} between two recordings, and it is split
+into two correlated sub-scores --- speaker similarity and accent similarity.
+Because the reference utterance is a different sentence spoken by the target
+speaker, the task cannot be reduced to signal-level comparison and must rely on
+content-independent speaker and accent representations.
+
+Two properties of the data shape any reasonable solution. First, the training
+set is small (2{,}800 rated pairs) and human ratings are noisy, which strongly
+favours frozen pretrained representations over fine-tuning; this echoes findings
+from earlier challenge editions where compact models outperformed large
+fine-tuned ones \cite{vmc23}. Second, both the development and evaluation sets
+contain systems that never appear in training --- 57\% of evaluation pairs come
+from four unseen systems --- so a model that implicitly memorises system
+identity will not generalise.
+
+Our contributions are: (1) a retrieval-augmented predictor that retrieves
+neighbouring \emph{pairs} in the space of embedding differences, with an
+ablation isolating why the retrieval space matters; (2) a system-level prior
+with an out-of-distribution-safe fallback, together with a leave-one-system-out
+stress test showing it never degrades performance; (3) transductive system-mean
+smoothing, a label-free inference-time step that provided the single largest
+gain on the evaluation set; (4) a grouped cross-validation harness calibrated
+against the public leaderboard; and (5) a set of negative results, including
+evidence that listener-dependent training hurts on this dataset.
+
+\section{Task and Data}
+
+Each item is a pair $(a,b)$ where $a$ is the output of a codec-resynthesis or
+neural-codec TTS system and $b$ is a natural VCTK recording of the target
+speaker reading a different sentence (3--7\,s, 16\,kHz). The targets are two
+utterance-level MOS values in $[1,5]$, and the primary metric is the
+utterance-level Spearman rank correlation coefficient (SRCC).
+
+The corpus \cite{codecmos} contains 4{,}000 samples from 24 systems covering 32
+VCTK speakers and 10 English accents. The training partition has 2{,}800 pairs
+from 21 systems with 13{,}687 listener-wise ratings (mean 4.9 raters per pair);
+the development and evaluation partitions each contain 600 pairs, with 2 and 4
+unseen systems respectively.
+
+Three statistics are relevant to the modelling choices below. The two sub-scores
+correlate at $0.86$ at utterance level and $0.79$ even within a single system,
+so they are not independently identifiable from these data. Within-pair listener
+standard deviation is $0.85$ (\textsc{spk}) and $0.92$ (\textsc{acc}) on a
+five-point scale; a split-half reliability estimate places the attainable
+utterance-level correlation near $0.81$ and $0.76$ respectively, so utterance
+level SRCC is intrinsically capped well below unity. Finally, between-system
+variance accounts for 45\% (\textsc{spk}) and 33\% (\textsc{acc}) of total
+variance, which motivates exploiting system-level structure explicitly.
+
+\section{Proposed System}
+
+\subsection{Frozen feature panel}
+
+We extract, for every waveform, representations from seven public pretrained
+models used entirely frozen: ECAPA-TDNN (192-d), TitaNet-Large (192-d),
+WeSpeaker ResNet34 (256-d), CommonAccent-ECAPA \cite{commonaccent} (192-d
+embedding plus a 16-class posterior), a wav2vec2 accent classifier (768-d hidden
+mean plus a 13-class posterior), WavLM-Large \cite{wavlm} (all 25 hidden layers,
+mean-pooled over time), and the UTMOS \cite{utmos} scalar quality score.
+Waveforms are used at 16\,kHz mono with each model's own front end; no
+augmentation, trimming or volume normalisation is applied.
+
+From these we build roughly 35 scalar pair features: the cosine similarity
+between $a$ and $b$ for every embedding source, the per-layer cosine for all 25
+WavLM layers, and $\mathrm{UTMOS}(a)$, $\mathrm{UTMOS}(b)$ and their difference.
+A ridge regressor ($\alpha=1$) on standardised features gives the parametric
+prediction $\hat{y}_{\text{ridge}}$. Scalar features cannot encode system
+identity, which is deliberate.
+
+\subsection{Retrieval in pair-difference space}
+
+RAMP \cite{ramp} augments a parametric MOS predictor with a $k$-nearest-neighbour
+retrieval over a training datastore, which is attractive in low-resource,
+out-of-distribution settings. The natural adaptation to a \emph{pairwise} task is
+to make the retrieval key describe the pair, not one utterance. We therefore
+define the pair-difference vector
+\begin{equation}
+  \mathbf{d}(a,b) = \bigoplus_{m \in \mathcal{M}}
+    \left( \frac{\mathbf{e}_m(a)}{\lVert \mathbf{e}_m(a)\rVert}
+         - \frac{\mathbf{e}_m(b)}{\lVert \mathbf{e}_m(b)\rVert} \right),
+\end{equation}
+where $\bigoplus$ is concatenation and $\mathcal{M}$ comprises ECAPA,
+CommonAccent, WavLM layer 3 (speaker-dominant) and WavLM layer 12
+(accent-dominant), giving 2{,}432 dimensions. We standardise, reduce to 128
+dimensions with PCA, and retrieve the $k=30$ nearest training pairs, weighting
+neighbour labels by $\mathrm{softmax}(-d_i/\bar{d})$ to obtain
+$\hat{y}_{\text{ret}}$. The two predictions are fused in $z$-space,
+\begin{equation}
+  \hat{y}_{\text{fuse}} = \beta\, z(\hat{y}_{\text{ridge}})
+                        + (1-\beta)\, z(\hat{y}_{\text{ret}}),
+\end{equation}
+with $\beta=0.8$ (\textsc{spk}) and $0.7$ (\textsc{acc}).
+
+\subsection{Trained pairwise head}
+
+For ensemble diversity we train a small head on frozen WavLM features. Per-task
+learnable softmax weights collapse the 25 layers into a single 1024-d vector,
+which a linear layer projects to 128-d. The pair representation
+$[\mathbf{p}_a, \mathbf{p}_b, |\mathbf{p}_a - \mathbf{p}_b|,
+\mathbf{p}_a \odot \mathbf{p}_b]$ feeds a shared trunk and two output heads. The
+loss combines mean squared error with a margin-ranking term (margin $0.3$)
+computed over batches sampled \emph{across} systems, so that the ranking
+objective cannot be satisfied by system identity alone. The head has 164{,}212
+trainable parameters; we average six seeds and combine with
+$\hat{y}_{\text{fuse}}$ by equally weighted $z$-averaging.
+
+\subsection{System-level prior with OOD-safe fallback}
+
+Because between-system variance dominates, we blend the prediction toward the
+training-label mean of the pair's system,
+$\hat{y}_{\text{prior}} = \alpha\, z(\hat{y}) + (1-\alpha)\, z(\bar{y}_{s})$,
+with $\alpha=0.5$ (\textsc{spk}) and $0.6$ (\textsc{acc}). For a system unseen in
+training no prior exists, and the model falls back to the plain cosine-based
+prediction. This fallback is what makes the prior safe under distribution shift
+(Section~\ref{sec:ablation}).
+
+\subsection{Transductive system-mean smoothing}
+
+The evaluation manifest reveals which system each pair belongs to, though not its
+quality. Since system-level signal is far more reliable than utterance-level
+signal, we apply a label-free smoothing step at inference,
+\begin{equation}
+  \hat{y}' = w\,\hat{y} + (1-w)\,\frac{1}{|S|}\sum_{j \in S} \hat{y}_j ,
+  \label{eq:smooth}
+\end{equation}
+where $S$ is the set of evaluation pairs from the same system and $w=0.7$. This
+uses no labels and is applied identically to seen and unseen systems. It
+sharpens the between-system ordering, which dominates SRCC, at the cost of
+within-system resolution that is largely rater noise. Scores are finally rescaled
+to $[1,5]$.
+
+\section{Validation Methodology}
+
+Because unseen systems dominate the evaluation set, we select all
+hyper-parameters using \emph{grouped cross-validation by system}: seven folds,
+each holding out whole systems. This choice was not cosmetic. A naive random
+split reported $0.63$ SRCC for an early model whose true development score was
+$0.36$, because random splits let the model memorise system identity.
+
+We verified that the harness tracks the leaderboard before trusting it. The
+zero-shot ECAPA cosine baseline scores $0.432$ under grouped CV, exactly matching
+its official development score of $0.432$; a wav2vec2 posterior cosine scores
+$0.323$ against $0.319$ on the leaderboard. This calibration allowed design
+decisions to be made locally, without consuming submissions.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Official evaluation results}
+
+Table~\ref{tab:eval} reports our official Track 3 results together with the two
+organiser baselines. Our system improves on the stronger baseline by $0.135$
+(\textsc{spk}) and $0.088$ (\textsc{acc}) utterance-level SRCC. At system level
+it reaches $0.942$ / $0.902$, placing third of seven teams for both sub-scores
+and within $0.006$ of the best system-level speaker score in the challenge.
+
+\begin{table}[t]
+\centering
+\caption{Official evaluation results (SRCC). Ranks are among the seven
+participating teams; B1/B2 are the organiser baselines.}
+\label{tab:eval}
+\small
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{Utterance-level} & \multicolumn{2}{c}{System-level} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+System & \textsc{spk} & \textsc{acc} & \textsc{spk} & \textsc{acc} \\
+\midrule
+B1 (ECAPA cosine)      & 0.414 & 0.386 & 0.874 & 0.838 \\
+B2 (ECAPA + head)      & 0.403 & 0.316 & 0.914 & 0.786 \\
+Best team              & 0.644 & 0.565 & 0.948 & 0.943 \\
+\midrule
+\textbf{Ours}          & \textbf{0.549} & \textbf{0.474}
+                       & \textbf{0.942} & \textbf{0.902} \\
+\quad rank             & 4th & 5th & 3rd & 3rd \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Effect of transductive smoothing}
+
+Smoothing (Eq.~\ref{eq:smooth}) was validated on 3{,}400 labelled pairs under
+grouped CV, where it gained $+0.008$ for both sub-scores, with a broad optimum
+over $w\in[0.5,0.9]$ rather than a sharp peak. On the withheld evaluation set the
+gain was substantially larger, as shown in Table~\ref{tab:smooth}: $+0.037$
+(\textsc{spk}) and $+0.016$ (\textsc{acc}). We attribute the amplification to the
+composition of the evaluation set, in which two unseen systems contribute 160
+pairs each; such large groups yield very stable predicted means, exactly the
+regime in which Eq.~\ref{eq:smooth} is most effective.
+
+\begin{table}[t]
+\centering
+\caption{Transductive system-mean smoothing, evaluation set (SRCC).}
+\label{tab:smooth}
+\small
+\begin{tabular}{lccc}
+\toprule
+System & \textsc{spk} & \textsc{acc} & mean \\
+\midrule
+Base (retrieval + head + prior) & 0.512 & 0.458 & 0.485 \\
+\quad + smoothing ($w=0.7$)     & \textbf{0.549} & \textbf{0.474} & \textbf{0.512} \\
+$\Delta$                        & $+0.037$ & $+0.016$ & $+0.026$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Ablations}
+\label{sec:ablation}
+
+Table~\ref{tab:ablate} isolates the retrieval space under grouped CV. Retrieval
+over the compact cosine scalars is statistically indistinguishable from ridge
+alone; only retrieval in the high-dimensional embedding-difference space helps.
+A single shared retrieval space outperforms per-target spaces, consistent with
+the $0.86$ coupling between the sub-scores, and four well-chosen sources beat
+nine, indicating that redundant embeddings dilute the neighbour distance.
+
+\begin{table}[t]
+\centering
+\caption{Retrieval-space ablation (grouped CV, pooled out-of-fold SRCC).}
+\label{tab:ablate}
+\small
+\begin{tabular}{lcc}
+\toprule
+Retrieval space & \textsc{spk} & \textsc{acc} \\
+\midrule
+Ridge only (no retrieval)            & 0.644 & 0.598 \\
+Cosine scalars (35-d)                & 0.648 & 0.602 \\
+\textbf{Embedding difference, 4 sources} & \textbf{0.665} & \textbf{0.630} \\
+Embedding difference, per-target     & 0.653 & 0.623 \\
+Embedding difference, 9 sources      & 0.659 & 0.621 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+We also stress-tested the system prior by sweeping the fraction of unseen systems
+in a leave-one-system-out protocol. The prior's advantage over the plain cosine
+prediction decreases monotonically from $+0.010$ at 50\% unseen to $+0.001$ at
+90\% unseen, but never becomes negative. The fallback design therefore makes the
+prior safe under severe distribution shift, in contrast to reports that learned
+domain priors degrade out of domain.
+
+\section{Negative Results}
+
+We report four negative findings, each verified under the calibrated harness.
+
+\textbf{Listener-dependent modelling hurts.} Training on all 13{,}687
+listener-wise ratings with learned listener embeddings and a mean-listener at
+inference --- the strategy popularised by UTMOS \cite{utmos} --- reduced grouped
+CV SRCC to $0.42$ / $0.44$, well below the $0.50+$ obtained from averaged labels.
+With only $4.9$ ratings per pair we believe per-listener training reintroduces
+the rater noise that averaging removes. This contradicts prior listener-modelling
+claims and, we suspect, marks a dataset-size threshold below which the technique
+is counterproductive.
+
+\textbf{Counterfactual pairs do not decorrelate the sub-scores.} Because every
+pair is a same-speaker attempt, the data never exhibits ``different speaker,
+same accent''. We manufactured such pairs from natural recordings with
+approximate labels, but they yielded no improvement: the metric evaluates
+same-speaker pairs only, so it cannot reward decorrelation.
+
+\textbf{Additional self-supervised backbones dilute.} Stacking HuBERT, XLS-R and
+WavLM-Base alongside WavLM-Large degraded performance relative to WavLM-Large
+alone.
+
+\textbf{Phonetic posteriorgram features are redundant.} PPG features improved a
+weaker configuration by $+0.013$ accent SRCC but changed the full pipeline by
+only $+0.001$, suggesting that WavLM mid-layers together with CommonAccent
+already capture the available pronunciation signal.
+
+\section{Conclusion}
+
+We presented a frozen-backbone system for pairwise speaker and accent similarity
+prediction whose distinguishing components are retrieval in pair-difference space
+and label-free transductive system-mean smoothing. The latter gave the largest
+single gain on the official evaluation set ($+0.037$ / $+0.016$ SRCC) and lifted
+our system-level correlations to third place among participating teams.
+
+Our main limitation is calibration: because we optimised rank correlation and
+rescaled outputs linearly, mean squared error was our weakest metric. Making the
+predictor accurate in absolute terms without sacrificing ranking quality is the
+natural next step, alongside pretraining the speaker branch on large public
+voice-similarity corpora such as VoxSim \cite{voxsim}, which we identify as the
+most credible remaining lever for the utterance-level gap. Code is available at
+\url{https://github.com/Ranjit246/voicemos-challenge-2026-exp}.
+
+\begin{thebibliography}{9}
+\small
+
+\bibitem{codecmos}
+W.-C. Huang \emph{et al.},
+``The VoiceMOS Challenge 2026 and the CodecMOS-Accent corpus,''
+\emph{arXiv preprint arXiv:2603.14328}, 2026.
+
+\bibitem{utmos}
+T. Saeki \emph{et al.},
+``UTMOS: UTokyo-SaruLab system for VoiceMOS Challenge 2022,''
+in \emph{Proc. Interspeech}, 2022.
+
+\bibitem{ramp}
+H. Wang \emph{et al.},
+``RAMP: Retrieval-augmented MOS prediction via confidence-based dynamic
+weighting,'' in \emph{Proc. Interspeech}, 2023.
+
+\bibitem{wavlm}
+S. Chen \emph{et al.},
+``WavLM: Large-scale self-supervised pre-training for full stack speech
+processing,'' \emph{IEEE J. Sel. Topics Signal Process.}, vol.~16, no.~6, 2022.
+
+\bibitem{commonaccent}
+J. Zuluaga-Gomez \emph{et al.},
+``CommonAccent: Exploring large acoustic pretrained models for accent
+classification based on Common Voice,'' in \emph{Proc. Interspeech}, 2023.
+
+\bibitem{voxsim}
+J. Ahn \emph{et al.},
+``VoxSim: A perceptual voice similarity dataset,''
+in \emph{Proc. Interspeech}, 2024.
+
+\bibitem{vmc23}
+E. Cooper \emph{et al.},
+``The VoiceMOS Challenge 2023: Zero-shot subjective speech quality prediction
+for multiple domains,'' in \emph{Proc. IEEE ASRU}, 2023.
+
+\bibitem{mosbench}
+W.-C. Huang \emph{et al.},
+``MOS-Bench: Benchmarking generalization ability of subjective speech quality
+assessment models,'' \emph{arXiv preprint arXiv:2411.03715}, 2024.
+
+\end{thebibliography}
+
+\end{document}

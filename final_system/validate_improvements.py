@@ -21,7 +21,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 
 EXP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(EXP, "idea-e-feature-fusion"))
+sys.path.insert(0, os.path.join(EXP, "experiments/idea-e-feature-fusion"))
 from features import build, train_table, emb_key  # noqa: E402
 
 DEVLAB = "/Users/ranjitpatro/Home/Research/VoiceMOS/eval_set/vmc2026_track3_eval_phase_distro_v3_syn/sets/dev_with_labels.csv"
@@ -35,9 +35,9 @@ def load(p):
     return {k: (v.numpy() if isinstance(v, torch.Tensor) else np.asarray(v)) for k, v in d.items()}
 
 
-ECAPA = load(os.path.join(EXP, "ecapa/embeddings.pt"))
-CACC = load(os.path.join(EXP, "idea-e-feature-fusion/commonaccent_emb.pt"))
-WAVLM = load(os.path.join(EXP, "idea-f-wavlm/wavlm_layers.pt"))
+ECAPA = load(os.path.join(EXP, "experiments/ecapa/embeddings.pt"))
+CACC = load(os.path.join(EXP, "experiments/idea-e-feature-fusion/commonaccent_emb.pt"))
+WAVLM = load(os.path.join(EXP, "experiments/idea-f-wavlm/wavlm_layers.pt"))
 SRC = [("ecapa", ECAPA), ("cacc", CACC), ("wl3", 3), ("wl12", 12)]
 
 

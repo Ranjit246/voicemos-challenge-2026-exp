@@ -73,7 +73,7 @@ No backbone fine-tuning (small data → frozen generalizes).
 
 **Component details.**
 - **Feature panel (frozen):** ECAPA-TDNN (`speechbrain/spkrec-ecapa-voxceleb`, 192-d), TitaNet-L
-  (NeMo, 192), WeSpeaker-ResNet34 (`pyannote/…-community-1`, 256), CommonAccent-ECAPA
+  (NeMo, 192), WeSpeaker-ResNet34 (`experiments/pyannote/…-community-1`, 256), CommonAccent-ECAPA
   (`Jzuluaga/…`, 192 emb + 16 posterior), wav2vec2 accent (`HamzaSidhu786/…`, 768 hidden + 13
   posterior), WavLM-Large (`microsoft/wavlm-large`, 25×1024, all layers), UTMOS
   (`tarepan/SpeechMOS`, scalar). Features are pair cosine similarities + UTMOS(a),UTMOS(b),diff.

@@ -31,18 +31,18 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 
 BASE        = os.path.dirname(os.path.abspath(__file__))
-TRAIN_AVG   = os.path.join(BASE, "titanet_large", "train_avg.csv")
+TRAIN_AVG   = os.path.join(BASE, "experiments", "titanet_large", "train_avg.csv")
 DATASET_DIR = "vmc2026_track3_train_phase_distro_v3_syn"
 N_SPLITS    = 7
 SEED        = 42
 
 # Every embedding dict we know how to load. Missing files are skipped.
 EMBEDDING_DICTS = {
-    "ecapa":           os.path.join(BASE, "ecapa/embeddings.pt"),
-    "titanet":         os.path.join(BASE, "titanet_large/infer/embeddings/embeddings/manifest_embeddings.pt"),
-    "wespeaker":       os.path.join(BASE, "pyannote/embeddings.pt"),
-    "wav2vec2_hidden": os.path.join(BASE, "wav2vec2/accent_hidden_embeddings.pt"),
-    "wav2vec2_prob":   os.path.join(BASE, "wav2vec2/accent_prob_embeddings.pt"),
+    "ecapa":           os.path.join(BASE, "experiments/ecapa/embeddings.pt"),
+    "titanet":         os.path.join(BASE, "experiments/titanet_large/infer/embeddings/embeddings/manifest_embeddings.pt"),
+    "wespeaker":       os.path.join(BASE, "experiments/pyannote/embeddings.pt"),
+    "wav2vec2_hidden": os.path.join(BASE, "experiments/wav2vec2/accent_hidden_embeddings.pt"),
+    "wav2vec2_prob":   os.path.join(BASE, "experiments/wav2vec2/accent_prob_embeddings.pt"),
 }
 
 

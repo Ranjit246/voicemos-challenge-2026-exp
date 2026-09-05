@@ -1,0 +1,77 @@
+% spconf.sty - ICASSP-style two-column US-letter layout.
+% NOTE: for the FINAL submission, replace this file with the official
+% spconf.sty from the ICASSP 2027 author kit.
+\def\ninept{\def\baselinestretch{.95}\let\normalsize\small\normalsize}
+
+\oddsidemargin  -0.31in
+\evensidemargin -0.31in
+\topmargin      -0.75in
+\headheight      0pt
+\headsep         0pt
+\textheight      9.0in
+\textwidth       7.0in
+\columnsep       0.3in
+\pagestyle{empty}
+\twocolumn
+\sloppy
+\flushbottom
+\parindent 1em
+
+\def\name#1{\gdef\@name{#1}}
+\gdef\@name{}
+\def\address#1{\gdef\@address{#1}}
+\gdef\@address{}
+\def\toappear#1{\gdef\@toappear{#1}}
+\gdef\@toappear{}
+
+\def\maketitle{%
+  \par
+  \begingroup
+    \def\thefootnote{\fnsymbol{footnote}}%
+    \twocolumn[\@maketitle]%
+    \@thanks
+  \endgroup
+  \setcounter{footnote}{0}%
+  \let\maketitle\relax \let\@maketitle\relax
+  \gdef\@thanks{}\gdef\@author{}\gdef\@title{}\let\thanks\relax}
+
+\def\@maketitle{%
+  \newpage
+  \null
+  \begin{center}
+    {\Large\bf \@title \par}
+    \vskip 1.2em
+    {\large \lineskip .5em \@name \par}
+    \vskip 0.6em
+    {\normalsize\it \@address \par}
+  \end{center}
+  \par
+  \vskip 1.5em}
+
+\renewcommand\section{\@startsection{section}{1}{\z@}%
+  {-3.0ex \@plus -1ex \@minus -.2ex}{1.6ex \@plus.2ex}%
+  {\normalsize\bf\centering}}
+\renewcommand\subsection{\@startsection{subsection}{2}{\z@}%
+  {-2.5ex\@plus -1ex \@minus -.2ex}{1.2ex \@plus .2ex}%
+  {\normalsize\bf}}
+\renewcommand\subsubsection{\@startsection{subsubsection}{3}{\z@}%
+  {-2.0ex\@plus -1ex \@minus -.2ex}{1.0ex \@plus .2ex}%
+  {\normalsize\it}}
+
+\renewcommand{\thesection}{\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+
+\def\abstract{\begin{center}{\bf ABSTRACT}\end{center}%
+  \begin{quotation}\small}
+\def\endabstract{\end{quotation}}
+
+\def\keywords{\vskip 0.4em plus 0.2em minus 0.2em%
+  \noindent{\small{\it Index Terms}---\ }}
+
+\setlength{\abovecaptionskip}{6pt}
+\setlength{\belowcaptionskip}{2pt}
+\long\def\@makecaption#1#2{\vskip \abovecaptionskip
+  \setbox\@tempboxa\hbox{\small #1: #2}%
+  \ifdim \wd\@tempboxa >\hsize \small #1: #2\par
+  \else \hbox to\hsize{\hfil\box\@tempboxa\hfil}\fi
+  \vskip\belowcaptionskip}
